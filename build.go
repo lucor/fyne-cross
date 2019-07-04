@@ -46,6 +46,8 @@ var (
 	verbose bool
 	// ldflags represents the flags to pass to the external linker
 	ldflags string
+	// projectecv represents the if your code need a external GOPATH env
+	projectenv bool
 )
 
 // builder is the command implementing the fyne app command interface
@@ -59,6 +61,7 @@ func (b *builder) addFlags() {
 	flag.StringVar(&cacheDir, "cache-dir", "", "The directory used to cache package dependencies. Default to system cache root directory (i.e. $HOME/.cache)")
 	flag.BoolVar(&verbose, "v", false, "Enable verbosity flag for go commands. Default to false")
 	flag.StringVar(&ldflags, "ldflags", "", "flags to pass to the external linker")
+	flag.BoolVar(&projectenv, "env", false, "Enable external GOPATH env. Default to false")
 }
 
 func (b *builder) printHelp(indent string) {
@@ -131,6 +134,7 @@ func (b *builder) run(args []string) {
 		output:   output,
 		verbose:  verbose,
 		ldflags:  ldflags,
+		projectenv: projectenv,
 	}
 
 	err = db.checkRequirements()
@@ -139,12 +143,12 @@ func (b *builder) run(args []string) {
 		os.Exit(1)
 	}
 
-	fmt.Println("Downloading dependencies")
-	err = db.goGet()
-	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
+	// fmt.Println("Downloading dependencies")
+	// err = db.goGet()
+	// if err != nil {
+	// 	fmt.Println(err)
+	// 	// os.Exit(1)
+	// }
 
 	fmt.Printf("Build output folder: %s/build\n", db.workDir)
 	for _, target := range targets {
@@ -168,6 +172,7 @@ type dockerBuilder struct {
 	cacheDir string
 	verbose  bool
 	ldflags  string
+	projectenv bool
 }
 
 // checkRequirements checks if all the build requirements are satisfied
@@ -202,6 +207,7 @@ func (d *dockerBuilder) goBuild(target string) error {
 	if d.verbose {
 		fmt.Printf("docker %s\n", strings.Join(args, " "))
 	}
+
 	cmd := exec.Command("docker", args...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -267,11 +273,28 @@ func (d *dockerBuilder) defaultArgs() []string {
 	// mount the cache user dir. Used to cache package dependencies (GOROOT/pkg and GOROOT/src)
 	args = append(args, "-v", fmt.Sprintf("%s/fyne-cross:/go", d.cacheDir))
 
+	// mount GOPATH to docker
+	sysGOPATH := strings.Split(os.Getenv("GOPATH"), ":")[1:]
+	for i, v := range sysGOPATH{
+		args = append(args, "-v", fmt.Sprintf("%s:/go%d",v,i))
+	}
+
 	// attempt to set fyne user id as current user id to handle mount permissions
 	u, err := user.Current()
 	if err == nil {
 		args = append(args, "-e", fmt.Sprintf("fyne_uid=%s", u.Uid))
 	}
+
+	//add workDir as project GOPATH
+	dockerEnv := ""
+	for i, _ := range sysGOPATH{
+		dockerEnv = dockerEnv + fmt.Sprintf("/go%d:",i)
+	}
+	dockerEnv = dockerEnv[:len(dockerEnv)-1]
+	if d.projectenv {
+		dockerEnv = dockerEnv + ":/app"
+	}
+	args = append(args, "-e", fmt.Sprintf("GOPATH=%s", dockerEnv))
 
 	return args
 }
