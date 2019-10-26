@@ -398,17 +398,24 @@ func parseTargets(targetList string) ([]string, error) {
 		target = strings.TrimSpace(target)
 
 		var isValid bool
-		if osAndArch := strings.Split(target, "/"); len(osAndArch) == 2 {
-			targetOs, targetArch := osAndArch[0], osAndArch[1]
-			if targetArch == "*" {
-				for _, okArch := range goosWithArch[targetOs] {
-					targets = append(targets, strings.Join([]string{targetOs, okArch}, "/"))
-					isValid = true
-				}
-			} else if _, ok := targetWithBuildOpts[target]; ok {
-				targets = append(targets, target)
-				isValid = true
+		osAndArch := strings.Split(target, "/")
+		if len(osAndArch) != 2 {
+			return targets, fmt.Errorf("Unsupported target %q", target)
+		}
+
+		targetOs, targetArch := osAndArch[0], osAndArch[1]
+		if targetArch == "*" {
+			okArchs, ok := goosWithArch[targetOs]
+			if !ok {
+				return targets, fmt.Errorf("Unsupported os %q", targetOs)
 			}
+			isValid = true
+			for _, arch := range okArchs {
+				targets = append(targets, strings.Join([]string{targetOs, arch}, "/"))
+			}
+		} else if _, ok := targetWithBuildOpts[target]; ok {
+			targets = append(targets, target)
+			isValid = true
 		}
 
 		if isValid == false {
