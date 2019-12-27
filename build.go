@@ -330,6 +330,7 @@ func (d *dockerBuilder) defaultArgs() []string {
 		"run",
 		"--rm",
 		"-t",
+		"--net=host",
 	}
 
 	// set workdir
