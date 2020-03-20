@@ -50,6 +50,8 @@ var supportedTargets = map[string][]string{
 }
 
 var (
+	// Docker image to use
+	dockerImage string
 	// targetList represents a list of target to build on separated by comma
 	targetList string
 	// output represents the named output file
@@ -80,6 +82,7 @@ func main() {
 	flag.Usage = printUsage
 
 	defaultTarget := strings.Join([]string{build.Default.GOOS, build.Default.GOARCH}, "/")
+	flag.StringVar(&dockerImage, "docker-image", "", "Docker image to use. Can be an image name or the path to a Dockerfile")
 	flag.StringVar(&targetList, "targets", defaultTarget, fmt.Sprintf("The list of targets to build separated by comma. Default to current GOOS/GOARCH %s", defaultTarget))
 	flag.StringVar(&output, "output", "", "The named output file. Default to package name")
 	flag.StringVar(&rootDir, "dir", "", "The root directory. Default current dir")
@@ -217,16 +220,22 @@ func run(args []string) {
 	for _, target := range targets {
 		fmt.Printf("Building for %s %s\n", target[0], target[1])
 
+		builderOpts := builder.Options{
+			Arch:        target[1],
+			Output:      output,
+			DockerImage: dockerImage,
+		}
+
 		var b builder.Builder
 		switch target[0] {
 		case "darwin":
-			b = builder.NewDarwin(target[1], output)
+			b = builder.NewDarwin(builderOpts)
 		case "linux":
-			b = builder.NewLinux(target[1], output)
+			b = builder.NewLinux(builderOpts)
 		case "windows":
-			b = builder.NewWindows(target[1], output)
+			b = builder.NewWindows(builderOpts)
 		case "android":
-			b = builder.NewAndroid(target[1], output)
+			b = builder.NewAndroid(builderOpts)
 		default:
 			fmt.Println("No builder defined for OS target", target[0])
 			os.Exit(1)

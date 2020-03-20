@@ -9,19 +9,17 @@ import (
 )
 
 // NewAndroid returns a builder for the linux OS
-func NewAndroid(arch string, output string) *Android {
+func NewAndroid(opts Options) *Android {
 	return &Android{
-		os:     "android",
-		arch:   arch,
-		output: output,
+		os:   "android",
+		opts: opts,
 	}
 }
 
 // Android is the build for the linux OS
 type Android struct {
-	os     string
-	arch   string
-	output string
+	os   string
+	opts Options
 }
 
 // PreBuild performs all tasks needed to perform a build
@@ -30,7 +28,7 @@ func (b *Android) PreBuild(vol *volume.Volume, opts PreBuildOptions) error {
 	if opts.AppID == "" {
 		return fmt.Errorf("appID is required for android build")
 	}
-	return goModInit(vol, opts.Verbose)
+	return goModInit(b, vol, opts.Verbose)
 }
 
 // Build builds the package
@@ -53,6 +51,14 @@ func (b *Android) BuildTags() []string {
 	return nil
 }
 
+// DockerImage returns the Docker image name used for building
+func (b *Android) DockerImage() string {
+	if b.opts.DockerImage != "" {
+		return b.opts.DockerImage
+	}
+	return androidDockerImage
+}
+
 // TargetID returns the target ID for the builder
 func (b *Android) TargetID() string {
 	return fmt.Sprintf("%s", b.os)
@@ -60,7 +66,7 @@ func (b *Android) TargetID() string {
 
 // Output returns the named output
 func (b *Android) Output() string {
-	return b.output
+	return b.opts.Output
 }
 
 // Package generate a package for distribution
@@ -81,7 +87,7 @@ func (b *Android) Package(vol *volume.Volume, opts PackageOptions) error {
 		"-appID", opts.AppID, // opts.AppID is mandatory for android app
 	}
 
-	err = dockerCmd(androidDockerImage, vol, []string{}, vol.WorkDirContainer(), command, opts.Verbose).Run()
+	err = runBuilderDockerCmd(b, vol, []string{}, vol.WorkDirContainer(), command, opts.Verbose)
 	if err != nil {
 		return fmt.Errorf("Could not package the Fyne app: %v", err)
 	}

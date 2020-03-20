@@ -12,42 +12,40 @@ import (
 )
 
 // NewWindows returns a builder for the Windows OS
-func NewWindows(arch string, output string) *Windows {
+func NewWindows(opts Options) *Windows {
 	return &Windows{
-		os:     "windows",
-		arch:   arch,
-		output: output,
+		os:   "windows",
+		opts: opts,
 	}
 }
 
 // Windows is the build for the Windows OS
 type Windows struct {
-	os     string
-	arch   string
-	output string
+	os   string
+	opts Options
 }
 
 // PreBuild performs all tasks needed to perform a build
 func (b *Windows) PreBuild(vol *volume.Volume, opts PreBuildOptions) error {
 	// ensures go.mod exists, if not try to create a temporary one
-	err := goModInit(vol, opts.Verbose)
+	err := goModInit(b, vol, opts.Verbose)
 	if err != nil {
 		return err
 	}
 
 	// Convert the png icon to ico format and store under the temp directory
-	convertPngToIco(opts.Icon, path.Join(vol.TmpDirHost(), b.output+".ico"))
+	convertPngToIco(opts.Icon, path.Join(vol.TmpDirHost(), b.opts.Output+".ico"))
 
 	// use the gowindres command to create the windows resource
 	command := []string{
 		gowindresCmd,
-		"-arch", b.arch,
-		"-output", b.output,
+		"-arch", b.opts.Arch,
+		"-output", b.opts.Output,
 		"-workdir", vol.TmpDirContainer(),
 	}
 
-	windres := b.output + ".syso"
-	err = dockerCmd(windowsDockerImage, vol, []string{}, vol.TmpDirContainer(), command, opts.Verbose).Run()
+	windres := b.opts.Output + ".syso"
+	err = runBuilderDockerCmd(b, vol, []string{}, vol.TmpDirContainer(), command, opts.Verbose)
 	if err != nil {
 		return fmt.Errorf("Could not create the windows resource %q: %v", windres, err)
 	}
@@ -77,9 +75,9 @@ func (b *Windows) Build(vol *volume.Volume, opts BuildOptions) error {
 	}
 
 	command := goBuildCmd(output, opts)
-	err := dockerCmd(windowsDockerImage, vol, b.BuildEnv(), vol.WorkDirContainer(), command, opts.Verbose).Run()
+	err := runBuilderDockerCmd(b, vol, b.BuildEnv(), vol.WorkDirContainer(), command, opts.Verbose)
 	if err != nil {
-		return fmt.Errorf("Could not build for %s/%s: %v", b.os, b.arch, err)
+		return fmt.Errorf("Could not build for %s/%s: %v", b.os, b.opts.Arch, err)
 	}
 
 	return nil
@@ -87,7 +85,7 @@ func (b *Windows) Build(vol *volume.Volume, opts BuildOptions) error {
 
 //BuildEnv returns the env variables required to build the package
 func (b *Windows) BuildEnv() []string {
-	switch b.arch {
+	switch b.opts.Arch {
 	case "amd64":
 		return []string{"GOOS=windows", "GOARCH=amd64", "CC=x86_64-w64-mingw32-gcc"}
 	case "386":
@@ -106,19 +104,27 @@ func (b *Windows) BuildTags() []string {
 	return nil
 }
 
+// DockerImage returns the Docker image name used for building
+func (b *Windows) DockerImage() string {
+	if b.opts.DockerImage != "" {
+		return b.opts.DockerImage
+	}
+	return windowsDockerImage
+}
+
 // TargetID returns the target ID for the builder
 func (b *Windows) TargetID() string {
-	return fmt.Sprintf("%s-%s", b.os, b.arch)
+	return fmt.Sprintf("%s-%s", b.os, b.opts.Arch)
 }
 
 // Output returns the named output
 func (b *Windows) Output() string {
-	return b.output + ".exe"
+	return b.opts.Output + ".exe"
 }
 
 // WindresOutput returns the named output for the windows resource
 func (b *Windows) windresOutput() string {
-	return fmt.Sprintf("%s.syso", b.output)
+	return fmt.Sprintf("%s.syso", b.opts.Output)
 }
 
 // Package generate a package for distribution

@@ -9,25 +9,23 @@ import (
 )
 
 // NewDarwin returns a builder for the Darwin OS
-func NewDarwin(arch string, output string) *Darwin {
+func NewDarwin(opts Options) *Darwin {
 	return &Darwin{
-		os:     "darwin",
-		arch:   arch,
-		output: output,
+		os:   "darwin",
+		opts: opts,
 	}
 }
 
 // Darwin is the build for the Darwin OS
 type Darwin struct {
-	os     string
-	arch   string
-	output string
+	os   string
+	opts Options
 }
 
 // PreBuild performs all tasks needed to perform a build
 func (b *Darwin) PreBuild(vol *volume.Volume, opts PreBuildOptions) error {
 	//ensures go.mod exists, if not try to create a temporary one
-	return goModInit(vol, opts.Verbose)
+	return goModInit(b, vol, opts.Verbose)
 }
 
 // Build builds the package
@@ -46,9 +44,9 @@ func (b *Darwin) Build(vol *volume.Volume, opts BuildOptions) error {
 	}
 
 	command := goBuildCmd(output, opts)
-	err := dockerCmd(darwinDockerImage, vol, b.BuildEnv(), vol.WorkDirContainer(), command, opts.Verbose).Run()
+	err := runBuilderDockerCmd(b, vol, b.BuildEnv(), vol.WorkDirContainer(), command, opts.Verbose)
 	if err != nil {
-		return fmt.Errorf("Could not build for %s/%s: %v", b.os, b.arch, err)
+		return fmt.Errorf("Could not build for %s/%s: %v", b.os, b.opts.Arch, err)
 	}
 
 	return nil
@@ -56,7 +54,7 @@ func (b *Darwin) Build(vol *volume.Volume, opts BuildOptions) error {
 
 //BuildEnv returns the env variables required to build the package
 func (b *Darwin) BuildEnv() []string {
-	switch b.arch {
+	switch b.opts.Arch {
 	case "amd64":
 		return []string{"GOOS=darwin", "GOARCH=amd64", "CC=o32-clang"}
 	case "386":
@@ -75,14 +73,22 @@ func (b *Darwin) BuildTags() []string {
 	return nil
 }
 
+// DockerImage returns the Docker image name used for building
+func (b *Darwin) DockerImage() string {
+	if b.opts.DockerImage != "" {
+		return b.opts.DockerImage
+	}
+	return darwinDockerImage
+}
+
 // TargetID returns the target ID for the builder
 func (b *Darwin) TargetID() string {
-	return fmt.Sprintf("%s-%s", b.os, b.arch)
+	return fmt.Sprintf("%s-%s", b.os, b.opts.Arch)
 }
 
 // Output returns the named output
 func (b *Darwin) Output() string {
-	return b.output
+	return b.opts.Output
 }
 
 // Package generate a package for distribution
@@ -106,7 +112,7 @@ func (b *Darwin) Package(vol *volume.Volume, opts PackageOptions) error {
 		command = append(command, "-appID", opts.AppID)
 	}
 
-	err = dockerCmd(darwinDockerImage, vol, []string{}, vol.TmpDirContainer(), command, opts.Verbose).Run()
+	err = runBuilderDockerCmd(b, vol, []string{}, vol.TmpDirContainer(), command, opts.Verbose)
 	if err != nil {
 		return fmt.Errorf("Could not package the Fyne app: %v", err)
 	}

@@ -9,25 +9,23 @@ import (
 )
 
 // NewLinux returns a builder for the linux OS
-func NewLinux(arch string, output string) *Linux {
+func NewLinux(opts Options) *Linux {
 	return &Linux{
-		os:     "linux",
-		arch:   arch,
-		output: output,
+		os:   "linux",
+		opts: opts,
 	}
 }
 
 // Linux is the build for the linux OS
 type Linux struct {
-	os     string
-	arch   string
-	output string
+	os   string
+	opts Options
 }
 
 // PreBuild performs all tasks needed to perform a build
 func (b *Linux) PreBuild(vol *volume.Volume, opts PreBuildOptions) error {
 	//ensures go.mod exists, if not try to create a temporary one
-	return goModInit(vol, opts.Verbose)
+	return goModInit(b, vol, opts.Verbose)
 }
 
 // Build builds the package
@@ -46,9 +44,9 @@ func (b *Linux) Build(vol *volume.Volume, opts BuildOptions) error {
 	}
 
 	command := goBuildCmd(output, opts)
-	err := dockerCmd(linuxDockerImage, vol, b.BuildEnv(), vol.WorkDirContainer(), command, opts.Verbose).Run()
+	err := runBuilderDockerCmd(b, vol, b.BuildEnv(), vol.WorkDirContainer(), command, opts.Verbose)
 	if err != nil {
-		return fmt.Errorf("Could not build for %s/%s: %v", b.os, b.arch, err)
+		return fmt.Errorf("Could not build for %s/%s: %v", b.os, b.opts.Arch, err)
 	}
 
 	return nil
@@ -56,7 +54,7 @@ func (b *Linux) Build(vol *volume.Volume, opts BuildOptions) error {
 
 //BuildEnv returns the env variables required to build the package
 func (b *Linux) BuildEnv() []string {
-	switch b.arch {
+	switch b.opts.Arch {
 	case "amd64":
 		return []string{"GOOS=linux", "GOARCH=amd64", "CC=gcc"}
 	case "386":
@@ -76,21 +74,29 @@ func (b *Linux) BuildLdFlags() []string {
 
 //BuildTags returns the default tags used to build the package
 func (b *Linux) BuildTags() []string {
-	switch b.arch {
+	switch b.opts.Arch {
 	case "arm", "arm64":
 		return []string{"gles"}
 	}
 	return nil
 }
 
+// DockerImage returns the Docker image name used for building
+func (b *Linux) DockerImage() string {
+	if b.opts.DockerImage != "" {
+		return b.opts.DockerImage
+	}
+	return linuxDockerImage
+}
+
 // TargetID returns the target ID for the builder
 func (b *Linux) TargetID() string {
-	return fmt.Sprintf("%s-%s", b.os, b.arch)
+	return fmt.Sprintf("%s-%s", b.os, b.opts.Arch)
 }
 
 // Output returns the named output
 func (b *Linux) Output() string {
-	return b.output
+	return b.opts.Output
 }
 
 // Package generate a package for distribution
@@ -110,7 +116,7 @@ func (b *Linux) Package(vol *volume.Volume, opts PackageOptions) error {
 		"-name", b.Output(),
 	}
 
-	err = dockerCmd(linuxDockerImage, vol, []string{}, vol.TmpDirContainer(), command, opts.Verbose).Run()
+	err = runBuilderDockerCmd(b, vol, []string{}, vol.TmpDirContainer(), command, opts.Verbose)
 	if err != nil {
 		return fmt.Errorf("Could not package the Fyne app: %v", err)
 	}
