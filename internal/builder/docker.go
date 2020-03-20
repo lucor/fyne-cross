@@ -18,11 +18,13 @@ type dockerImageProvider interface {
 	DockerImageName() (string, error)
 }
 
-type dockerRemoteImage struct {
+// Docker image referenced by name. Might be local
+// or remote.
+type dockerImageName struct {
 	Name string
 }
 
-func (d *dockerRemoteImage) DockerImageName() (string, error) {
+func (d *dockerImageName) DockerImageName() (string, error) {
 	return d.Name, nil
 }
 
@@ -55,8 +57,8 @@ func newDockerImageProvider(imageName string) dockerImageProvider {
 	if filepath.Base(imageName) == "Dockerfile" && isFile(imageName) {
 		return &dockerFile{Path: imageName}
 	}
-	// Assume it's a remote image name
-	return &dockerRemoteImage{Name: imageName}
+	// Assume it's an image name
+	return &dockerImageName{Name: imageName}
 }
 
 // dockerCmd exec a command inside the container for the specified image
