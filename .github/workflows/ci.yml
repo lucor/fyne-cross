@@ -15,7 +15,7 @@ jobs:
       - name: Install goimports
         run: go get -v golang.org/x/tools/cmd/goimports
 
-      # Checks-out the repository under $GITHUB_WORKSPACE 
+      # Checks-out the repository under $GITHUB_WORKSPACE
       - uses: actions/checkout@v2
 
       # Run linters
@@ -34,13 +34,13 @@ jobs:
         go-version: ["1.14.x", "1.13.x"]
 
     steps:
-    - name: Setup Go environment
-    - uses: actions/setup-go@v2
-      with:
-        go-version: ${{ matrix.go-version }}
+      - name: Setup Go environment
+      - uses: actions/setup-go@v2
+        with:
+          go-version: ${{ matrix.go-version }}
 
-    # Checks-out the repository under $GITHUB_WORKSPACE
-    - uses: actions/checkout@v2
-    
-    # Run tests
-    - run: go test -race ./...
+      # Checks-out the repository under $GITHUB_WORKSPACE
+      - uses: actions/checkout@v2
+
+      # Run tests
+      - run: go test -race ./...
