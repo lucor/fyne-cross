@@ -1,3 +1,7 @@
+# ARCHIVED
+
+fyne-cross is now an official Fyne project and has been moved to: https://github.com/fyne-io/fyne-cross
+
 # Fyne Cross
 
 [![CI](https://github.com/lucor/fyne-cross/workflows/CI/badge.svg)](https://github.com/lucor/fyne-cross/actions?query=workflow%3ACI) [![Go Report Card](https://goreportcard.com/badge/github.com/lucor/fyne-cross)](https://goreportcard.com/report/github.com/lucor/fyne-cross) [![GoDoc](https://godoc.org/github.com/lucor/fyne-cross?status.svg)](http://godoc.org/github.com/lucor/fyne-cross) [![version](https://img.shields.io/github/v/tag/lucor/fyne-cross?label=version)]()
